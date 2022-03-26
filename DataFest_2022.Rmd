@@ -17,11 +17,15 @@ library(tidyverse)
 # Read the data
 
 player1 <- read.csv("Data/player-6607011.csv")
+
+player2 <- read.csv("Data/player-6486029.csv")
 ```
 
 ```{r}
-player1 %>% filter(!is.na(player1$total_points)) %>% 
-  select(player_points, total_points)
+player1 %>% 
+  filter(!is.na(player1$amount_gained)) %>% 
+  select(event_description, amount_gained)
+  
 ```
 
 ```{r}
