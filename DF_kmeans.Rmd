@@ -1,0 +1,202 @@
+---
+title: "Kmeans"
+author: "Wenxuan Zhu"
+date: "2022/3/25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+library(dplyr)
+library(readr)
+library(broom)
+library(ggplot2)
+library(tidymodels) 
+library(stringr)
+library(tidyverse)
+library(gplots)
+library(lubridate)
+library(gapminder)
+library(purrr)
+library(stringr)
+library(vip)
+library(probably)
+library(plotly)
+library(tidyr)
+
+tidymodels_prefer() # Resolves conflicts, prefers tidymodel functions
+set.seed(189) 
+```
+
+
+```{r}
+# Read the data
+player1 <- read.csv("player-6607011.csv")
+player2 <- read.csv("player-6486029.csv")
+player3 <- read.csv("player-6427031 .csv")
+logdata <- read.csv("logs.csv",stringsAsFactors=FALSE, header=T, nrows=500000)
+wholeData <- read.csv("cleaned-whole.csv")
+S5_scores_cleaned <- read.csv("S5_scores_cleaned.csv")
+
+col_name <- as.vector(read.csv("logs.csv", header=FALSE, colClasses='character', nrows=1))
+d<- read.csv("logs.csv",stringsAsFactors=FALSE, header=T, nrows=20000, col.names = col_name, skip = 14997)
+
+
+d %>% count(player_id)
+
+logdata %>% 
+  count(player_id)
+
+player4 <- logdata %>% 
+  filter(player_id == 6427004)
+
+```
+
+
+```{r}
+player123 <- rbind(player1, player2, player3)
+player123 %>% 
+  group_by(player_id) %>% 
+  mutate(firstday = min(date),
+    weeks = difftime(date,firstday , units = "weeks")) %>% 
+  summarise(player_id, max_skill_level_know = max(skill_level_know,na.rm = TRUE), 
+          max_skill_level_priority = max(skill_level_priority,na.rm = TRUE),
+          max_skill_level_people = max(skill_level_people,na.rm = TRUE),
+          max_skill_level_refusal = max(skill_level_refusal,na.rm = TRUE),
+          max_skill_level_me = max(skill_level_me,na.rm = TRUE)) %>% 
+  distinct()
+
+player2 %>% 
+  count(data_headers)
+
+player3 %>% 
+  count(data_headers)
+
+```
+
+
+```{r}
+naProportion <- (colMeans(is.na(player1)))*100
+plot(naProportion)
+```
+# read in 
+```{r}
+skill <- read.csv("skill.csv")
+head(skill)
+```
+
+
+# clean data
+```{r}
+wholeData_drug <- wholeData %>%
+  # filter(str_detect(stack_id,"3")) %>%
+  mutate(mins_drug = hms(event_time)) %>%
+  mutate(mins_drug_event = hour(mins_drug)*60 + minute(mins_drug)) %>%
+  select(-mins_drug)
+  
+head(wholeData_drug)
+
+# join skill
+kmeans_data <- wholeData_drug %>%
+  group_by(player_id) %>%
+  fill(everything(), .direction = "downup") %>%
+  slice(1) %>%
+  ungroup() %>%
+  full_join(skill, by = "player_id") 
+
+
+view(kmeans_data)
+
+write.csv(kmeans_data, "kmeans_data.csv")
+
+# S5_scores_4 <- S5_scores_cleaned %>% 
+#   group_by(player_id) %>%
+#   mutate(max_week = max(weeks)) %>%
+#   filter(max_week >= 4) %>%
+#   select(-max_week)
+# 
+# head(S5_scores_4)
+```
+
+# K-means trail 1 (wholeData)
+
+```{r}
+kmeans_data_sub <- kmeans_data %>%
+  select( max_skill_level_priority, 
+         max_skill_level_refusal) %>%
+  na.omit()
+
+set.seed(253)
+kclust_k3 <- kmeans(kmeans_data_sub, centers = 3)
+
+kclust_k3$cluster
+
+# Data-specific function to cluster and calculate total within-cluster SS
+drug_cluster_ss <- function(k){
+    # Perform clustering
+    kclust3 <- kmeans(scale(kmeans_data_sub), centers = 3)
+
+    # Return the total within-cluster sum of squares
+    return(kclust3$tot.withinss)
+}
+drug_cluster_ss
+```
+```{r}
+# Add a variable (kclust_k3) to the original dataset 
+# containing the cluster assignments
+kmeans_data_k3 <- kmeans_data %>%
+  drop_na( max_skill_level_priority, 
+         max_skill_level_refusal) %>%
+  mutate(kclust_3 = factor(kclust_k3$cluster))
+
+# Visualize the cluster assignments on the original scatterplot
+ggplot(kmeans_data_k3, aes(x = max_skill_level_refusal, 
+                        y =  max_skill_level_priority,  color = kclust_3)) + 
+  geom_point() + 
+  theme_classic()
+```
+
+
+```{r}
+p <- plot_ly(kmeans_data_k3, x=~max_skill_level_refusal, y=~max_skill_level_priority, z=~max_skill_level_people, color =~kclust_3) %>%
+  add_markers(size=1) %>%
+  labs(title = "Total weight in grams harvests on each day for each variety of beet")
+
+p
+
+library(htmlwidgets)
+p <- plot_ly(x = rnorm(100))
+saveWidget(p, "p1.html", selfcontained = F, libdir = "lib")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
